@@ -1,10 +1,10 @@
 #!/bin/bash
 
-# Clear previous builds
-rm -f *.o
 rm -f arrays.out
 
-echo "Assembiling"
+echo "Assembling..."
+
+nasm -f elf64 -o getfrequency.o getfrequency.asm
 
 nasm -f elf64 -o input_array.o input_array.asm
 nasm -f elf64 -o isfloat.o isfloat.asm
@@ -12,13 +12,12 @@ nasm -f elf64 -o manager.o manager.asm
 nasm -f elf64 -o maximum.o maximum.asm
 nasm -f elf64 -o reverse.o reverse.asm
 
-echo "Compiling"
+echo "Compiling C++ modules..."
 
-# -fno-pie and -no-pie are often required for older linking styles or specific assembly setups
 g++ -c -m64 -Wall -std=c++17 -o main.o main.cpp -fno-pie
 g++ -c -m64 -Wall -std=c++17 -o output_array.o output_array.cpp -fno-pie
 
-echo "Link the object files"
+echo "Linking all object files..."
 
 g++ -m64 -std=c++17 -no-pie -o arrays.out \
     main.o \
@@ -27,13 +26,12 @@ g++ -m64 -std=c++17 -no-pie -o arrays.out \
     isfloat.o \
     maximum.o \
     reverse.o \
-    output_array.o
+    output_array.o \
+    getfrequency.o
 
-echo "Run the Program"
 chmod +x arrays.out
 ./arrays.out
 
-# delete the object files after running the program
 rm -f *.o
 
 echo "The script has terminated."

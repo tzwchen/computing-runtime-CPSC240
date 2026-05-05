@@ -44,34 +44,42 @@
 
 ;Begin code
 
+; Updated for Assignment 6: Computing Runtime
+; Purpose: Benchmark array processing by measuring clock tics and frequency.
+
 extern printf
 extern getchar
 extern input_array
 extern maximum
 extern reverse
 extern output_array
+extern getfreq          ; External function provided by professor
+
 global manager
 global array
 
-;declarations
-segment .bss
-    size resq 1 ; reserve space for the size of the array
-    array resq 100
 segment .data
-    recieved_input db "These numbers were recieved and place into an array", 0
-    max_msg db "The maximum value in the array is: ", 0
-    reverse_msg db "The array has been reversed. The array is now the following: ", 0
-    again db "Do you hvae another data set to process (Y or N)? ", 0
-    directions db "For the array enter a sequence of 64-bit floats seperated by white space.", 0
-    directions2 db "After the last input press enter followed by Control+D:", 0
+    directions  db "For the array enter a sequence of 64-bit floats separated by white space.", 10, 0
+    directions2 db "After the last input press enter followed by Control+D:", 10, 0
+    
+    ; Benchmarking Messages
+    tics_pre    db "The time on the clock is now %lu tics", 10, 0
+    tics_post   db "The time on the clock is now %lu tics", 10, 0
+    tics_total  db "The runtime of the sort function was %lu tics", 10, 0
+    freq_msg    db "The frequency of the clock of this computer is %0.1lf GHz", 10, 0
+    nano_msg    db "The run time of the sort function is %0.2lf nanoseconds", 10, 0
+    
+    again       db "Do you have another data set to process (Y or N)? ", 0
+
+segment .bss
+    array resq 100
 
 segment .text
 
-manager: ;this is a loop btw
+manager:
     push rbp
     mov rbp, rsp
 
-    ;print directions
     lea rdi, [directions]
     xor rax, rax
     call printf
@@ -79,38 +87,87 @@ manager: ;this is a loop btw
     xor rax, rax
     call printf
 
-    ;call input array 
-    lea rdi, [array] ;pass array address
+    lea rdi, [array]
     call input_array
-    mov r12, rax ;save the number of elements returned
+    mov r12, rax             ;
 
-    ;call maximum to find the maximum value in the array
+    ; --- Benchmarking Start ---
+    ; Get initial timestamp
+    lfence
+    rdtsc                   
+    lfence
+    shl rdx, 32
+    or rax, rdx
+    mov r13, rax             
+
+    lea rdi, [tics_pre]
+    mov rsi, r13
+    xor rax, rax
+    call printf
+
+    ; --- Call Functions (Benchmarked Block) ---
     lea rdi, [array]
     mov rsi, r12
     call maximum
 
-    ;call reverse to reverse the order of the elements in the array
     lea rdi, [array]
     mov rsi, r12
     call reverse
 
-    ;call output_array to display the array
-    lea rdi, [reverse_msg]
+    ; --- Benchmarking End ---
+    lfence
+    rdtsc
+    lfence
+    shl rdx, 32
+    or rax, rdx
+    mov r14, rax             
+
+    lea rdi, [tics_post]
+    mov rsi, r14
     xor rax, rax
     call printf
+
+    ; Calculate elapsed tics
+    mov r15, r14
+    sub r15, r13            
+
+    lea rdi, [tics_total]
+    mov rsi, r15
+    xor rax, rax
+    call printf
+
+    ; --- Get Frequency and Calculate Nanoseconds ---
+    call getfreq             
+    movsd xmm8, xmm0         
+
+    lea rdi, [freq_msg]
+    ; xmm0 already contains freq
+    mov rax, 1
+    call printf
+
+    ; Nanoseconds = tics / frequency
+    cvtsi2sd xmm9, r15       ;
+    divsd xmm9, xmm8         
+
+    lea rdi, [nano_msg]
+    movsd xmm0, xmm9
+    mov rax, 1
+    call printf
+
+    ; --- Output and Loop ---
     lea rdi, [array]
     mov rsi, r12
     call output_array
 
-    ;ask user if they want to process another data set
     lea rdi, [again]
     xor rax, rax
     call printf
     call getchar
     call getchar
     cmp al, 'Y'
-    je manager ;repeat if user wants to do it again
+    je manager 
 
-    mov rax, r12 ;returns sie to main.cpp
+    ; Return nanoseconds to main as requested [cite: 41]
+    cvtsd2si rax, xmm9
     pop rbp
     ret
